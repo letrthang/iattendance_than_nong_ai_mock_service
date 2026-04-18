@@ -163,6 +163,60 @@ curl -X POST https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat
 
 ---
 
+## Testing the API & Markdown Responses
+
+### Test from browser DevTools console
+
+> ⚠️ Must run from a **normal webpage tab** (e.g. `https://google.com`), NOT from a `chrome://` internal page — Chrome blocks external fetch requests from internal pages due to CSP.
+
+Open any regular tab → DevTools (`F12`) → Console:
+
+```javascript
+fetch('https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ session_id: 'test', company_id: 'c1', user_id: 'u1', message: 'hi' })
+})
+.then(r => r.json())
+.then(data => console.log(data.reply))   // ← real newlines, ready for Markdown renderer
+```
+
+### How Markdown responses work
+
+The `reply` field contains either plain text or Markdown with real newline characters (`\n`).
+
+| What you see | Why |
+|---|---|
+| `\n` in Swagger / raw JSON | Normal — JSON encoding of newline character |
+| Real line breaks in `console.log(data.reply)` | `JSON.parse()` converts `\n` → actual newline |
+| Rendered Markdown in web app | Pass `data.reply` to a Markdown renderer |
+
+**Recommended renderer by framework:**
+
+| Framework | Library |
+|---|---|
+| React | `react-markdown` |
+| Vue | `vue-markdown-render` |
+| Angular | `ngx-markdown` |
+| Vanilla JS | `marked.js` |
+
+```jsx
+// React example
+import ReactMarkdown from 'react-markdown'
+<ReactMarkdown>{message.reply}</ReactMarkdown>
+```
+
+### Test from terminal (simplest — shows rendered newlines)
+
+```bash
+curl -s -X POST https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"test","company_id":"c1","user_id":"u1","message":"hi"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['reply'])"
+```
+
+---
+
 ## Run locally
 
 ```bash
