@@ -9,19 +9,19 @@
 
 ```
 Web App (iAttendance)
-        │
-        │  POST /api/chat
-        ▼
-┌──────────────────────────────────────┐
-│  Mock Thần Nông AI Service (Python)  │
-│  FastAPI  ·  Render.com (free tier)  │
-│                                      │
-│  • Returns 1 of 100 random replies   │
-│  • Maintains in-memory session log   │
-│  • CORS enabled for web app calls    │
-└──────────────────────────────────────┘
-        │
-        ▼
+        |
+        |  POST /api/chat
+        v
++--------------------------------------+
+|  Mock Than Nong AI Service (Python)  |
+|  FastAPI  .  Render.com (free tier)  |
+|                                      |
+|  . Returns 1 of 100 random replies   |
+|  . Maintains in-memory session log   |
+|  . CORS enabled for web app calls    |
++--------------------------------------+
+        |
+        v
   Public endpoint (Render.com)
   https://iattendance-than-nong-ai-mock-service.onrender.com
 ```
@@ -50,10 +50,11 @@ iattendance_than_nong_ai_mock_service/
 
 ## API Contract
 
-All endpoints live under the same base URL.  
+All endpoints live under the same base URL.
 The contract **matches the real Thần Nông AI** so no web-app changes are needed at cutover.
 
 ### `GET /health`
+
 Health check.
 
 **Response `200`**
@@ -64,6 +65,7 @@ Health check.
 ---
 
 ### `POST /api/sessions`
+
 Create a new chat session.
 
 **Request body**
@@ -89,6 +91,7 @@ Create a new chat session.
 ---
 
 ### `POST /api/chat`
+
 Send a message and receive a mock AI reply.
 
 **Request body**
@@ -109,15 +112,50 @@ Send a message and receive a mock AI reply.
   "company_id": "string",
   "user_id": "string",
   "user_message": "string",
-  "reply": "string",
+  "reply": "string  ← plain text OR Markdown — see important note below",
   "timestamp": "ISO-8601"
 }
 ```
 
 ---
 
+### ⚠️ Important for Web App Consumers — `reply` field format
+
+The `reply` field returns either **plain text** or **Markdown** (randomly selected, 40/60 split):
+
+| Type | Frequency | Example |
+|------|-----------|---------|
+| Plain text | 40 / 100 | `"Bạn đã check-in lúc 08:02 sáng nay."` |
+| Markdown | 60 / 100 | `"## ✅ Check-in\n\n**Thời gian:** 08:02\n\n> Chúc bạn..."` |
+
+**Your web app MUST render `reply` through a Markdown renderer.**
+Plain text passes through a Markdown renderer unchanged, so one renderer handles both cases.
+
+**Recommended renderer by framework:**
+
+| Framework | Library |
+|-----------|---------|
+| React | `react-markdown` |
+| Vue | `vue-markdown-render` |
+| Angular | `ngx-markdown` |
+| Vanilla JS | `marked.js` |
+
+```jsx
+// React — handles both plain text and Markdown automatically
+import ReactMarkdown from 'react-markdown'
+
+<ReactMarkdown>{message.reply}</ReactMarkdown>
+```
+
+**Note on newlines:** The `reply` string contains real newline characters (`\n`).
+In the raw JSON response they appear as `\n` (standard JSON encoding) — this is expected.
+After `fetch().then(r => r.json())` they become real newlines automatically. No manual string replacement needed.
+
+---
+
 ### `GET /api/sessions/{session_id}/history`
-Return all messages in a session (in-memory, resets on restart).
+
+Return all messages in a session (in-memory, resets on service restart).
 
 **Response `200`**
 ```json
@@ -127,11 +165,41 @@ Return all messages in a session (in-memory, resets on restart).
     {
       "message_id": "uuid",
       "sender": "user | assistant",
-      "content": "string",
+      "content": "string (plain text OR Markdown)",
       "timestamp": "ISO-8601"
     }
   ]
 }
+```
+
+---
+
+## Testing the API
+
+### From browser DevTools console
+
+> ⚠️ Run from a **normal webpage tab** (e.g. `https://google.com`), **NOT** from a `chrome://` internal page.
+> Chrome blocks external fetch requests from internal pages due to Content Security Policy (CSP).
+
+Open any regular tab → DevTools (`F12`) → Console:
+
+```javascript
+fetch('https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ session_id: 'test', company_id: 'c1', user_id: 'u1', message: 'hi' })
+})
+.then(r => r.json())
+.then(data => console.log(data.reply))  // real newlines, ready for Markdown renderer
+```
+
+### From terminal
+
+```bash
+curl -s -X POST https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"test","company_id":"c1","user_id":"u1","message":"hi"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['reply'])"
 ```
 
 ---
@@ -144,13 +212,7 @@ Render auto-deploys from GitHub on every push to `main`.
 1. Go to [https://render.com](https://render.com) → **New Web Service**
 2. Connect this GitHub repo
 3. Render detects `render.yaml` automatically → click **Apply**
-4. Service is live at `https://iattendance-thannong-ai-mock.onrender.com`
-
-### Manual deploy trigger
-```bash
-# Just push to main — Render picks it up automatically
-git push origin main
-```
+4. Service is live at `https://iattendance-than-nong-ai-mock-service.onrender.com`
 
 ### Verify
 ```bash
@@ -159,60 +221,6 @@ curl https://iattendance-than-nong-ai-mock-service.onrender.com/health
 curl -X POST https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id":"test-123","company_id":"cmp-1","user_id":"usr-1","message":"Xin chào"}'
-```
-
----
-
-## Testing the API & Markdown Responses
-
-### Test from browser DevTools console
-
-> ⚠️ Must run from a **normal webpage tab** (e.g. `https://google.com`), NOT from a `chrome://` internal page — Chrome blocks external fetch requests from internal pages due to CSP.
-
-Open any regular tab → DevTools (`F12`) → Console:
-
-```javascript
-fetch('https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ session_id: 'test', company_id: 'c1', user_id: 'u1', message: 'hi' })
-})
-.then(r => r.json())
-.then(data => console.log(data.reply))   // ← real newlines, ready for Markdown renderer
-```
-
-### How Markdown responses work
-
-The `reply` field contains either plain text or Markdown with real newline characters (`\n`).
-
-| What you see | Why |
-|---|---|
-| `\n` in Swagger / raw JSON | Normal — JSON encoding of newline character |
-| Real line breaks in `console.log(data.reply)` | `JSON.parse()` converts `\n` → actual newline |
-| Rendered Markdown in web app | Pass `data.reply` to a Markdown renderer |
-
-**Recommended renderer by framework:**
-
-| Framework | Library |
-|---|---|
-| React | `react-markdown` |
-| Vue | `vue-markdown-render` |
-| Angular | `ngx-markdown` |
-| Vanilla JS | `marked.js` |
-
-```jsx
-// React example
-import ReactMarkdown from 'react-markdown'
-<ReactMarkdown>{message.reply}</ReactMarkdown>
-```
-
-### Test from terminal (simplest — shows rendered newlines)
-
-```bash
-curl -s -X POST https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"session_id":"test","company_id":"c1","user_id":"u1","message":"hi"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['reply'])"
 ```
 
 ---
@@ -236,21 +244,16 @@ curl -X POST http://localhost:8000/api/chat \
 
 ## Mock Responses Coverage
 
-The 100 pre-written responses cover the following iAttendance domains:
-
-| Domain | # responses |
-|---|---|
-| Attendance / check-in / check-out | 15 |
-| Leave management | 12 |
-| Payslip & salary | 10 |
-| Orders & revenue | 10 |
-| Farm management | 8 |
-| Customer support tickets | 8 |
-| Assets & devices | 7 |
-| Visitors | 5 |
-| General greetings & small-talk | 15 |
-| Errors / unknown queries | 10 |
-| **Total** | **100** |
+| Domain | Format | # |
+|--------|--------|---|
+| Attendance / check-in / check-out | Markdown | 12 |
+| Leave management | Markdown | 10 |
+| Payslip & salary | Markdown | 10 |
+| Orders & revenue | Markdown | 8 |
+| Farm management | Markdown | 8 |
+| Support, visitors & general | Markdown | 12 |
+| All domains mixed | Plain text | 40 |
+| **Total** | | **100** |
 
 ---
 
@@ -265,17 +268,16 @@ The 100 pre-written responses cover the following iAttendance domains:
 | Local dev | `http://localhost:8000` |
 | Local Swagger UI | `http://localhost:8000/docs` |
 
-> ⚠️ Render free tier **spins down after 15 min of inactivity** — first request after idle takes ~30s to cold-start.  
+> ⚠️ Render free tier **spins down after 15 min of inactivity** — first request after idle takes ~30s to cold-start.
 > Upgrade to a paid plan or add an uptime-ping cron if always-on is needed.
 
 ---
 
 ## Swap to Real Thần Nông AI
 
-When the real service is ready, update the web app's base URL env var:
+When the real service is ready, update the web app base URL env var:
 
 ```env
-# .env (web app)
 # Before (mock)
 THANNONG_AI_BASE_URL=https://iattendance-than-nong-ai-mock-service.onrender.com
 
@@ -284,4 +286,3 @@ THANNONG_AI_BASE_URL=https://thannong-ai.your-domain.com
 ```
 
 No other changes needed — the API contract is identical.
-
