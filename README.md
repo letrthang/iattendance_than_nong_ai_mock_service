@@ -23,7 +23,7 @@ Web App (iAttendance)
         │
         ▼
   Public endpoint (Render.com)
-  https://iattendance-thannong-ai-mock.onrender.com
+  https://iattendance-than-nong-ai-mock-service.onrender.com
 ```
 
 **Later swap**: When the real Thần Nông AI is ready, the web app only needs to change the base URL — the API contract is identical.
@@ -154,9 +154,9 @@ git push origin main
 
 ### Verify
 ```bash
-curl https://iattendance-thannong-ai-mock.onrender.com/health
+curl https://iattendance-than-nong-ai-mock-service.onrender.com/health
 
-curl -X POST https://iattendance-thannong-ai-mock.onrender.com/api/chat \
+curl -X POST https://iattendance-than-nong-ai-mock-service.onrender.com/api/chat \
   -H "Content-Type: application/json" \
   -d '{"session_id":"test-123","company_id":"cmp-1","user_id":"usr-1","message":"Xin chào"}'
 ```
@@ -204,7 +204,7 @@ The 100 pre-written responses cover the following iAttendance domains:
 
 | Environment | URL |
 |---|---|
-| **Production mock** | `https://iattendance-thannong-ai-mock.onrender.com` |
+| **Production mock** | `https://iattendance-than-nong-ai-mock-service.onrender.com` |
 | Local dev | `http://localhost:8000` |
 
 > ⚠️ Render free tier **spins down after 15 min of inactivity** — first request after idle takes ~30s to cold-start.  
@@ -219,7 +219,7 @@ When the real service is ready, update the web app's base URL env var:
 ```env
 # .env (web app)
 # Before (mock)
-THANNONG_AI_BASE_URL=https://iattendance-thannong-ai-mock.onrender.com
+THANNONG_AI_BASE_URL=https://iattendance-than-nong-ai-mock-service.onrender.com
 
 # After (real)
 THANNONG_AI_BASE_URL=https://thannong-ai.your-domain.com
