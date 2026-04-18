@@ -205,7 +205,11 @@ The 100 pre-written responses cover the following iAttendance domains:
 | Environment | URL |
 |---|---|
 | **Production mock** | `https://iattendance-than-nong-ai-mock-service.onrender.com` |
+| **Swagger UI** | `https://iattendance-than-nong-ai-mock-service.onrender.com/docs` |
+| **ReDoc** | `https://iattendance-than-nong-ai-mock-service.onrender.com/redoc` |
+| **OpenAPI JSON** | `https://iattendance-than-nong-ai-mock-service.onrender.com/openapi.json` |
 | Local dev | `http://localhost:8000` |
+| Local Swagger UI | `http://localhost:8000/docs` |
 
 > ⚠️ Render free tier **spins down after 15 min of inactivity** — first request after idle takes ~30s to cold-start.  
 > Upgrade to a paid plan or add an uptime-ping cron if always-on is needed.
