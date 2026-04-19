@@ -39,7 +39,8 @@ Web App (iAttendance) / External Services
 |-------|--------|-------------|
 | **OpenClaw-compatible** | `/api/v1/gateway/*`, `/api/v1/sessions/*` | Session management and messaging (OpenClaw spec) |
 | **OpenAI-compatible** | `/v1/chat/completions` | Drop-in replacement for OpenAI Chat Completions API |
-| **Legacy** | `/api/chat`, `/api/sessions` | Original endpoints kept for backward compatibility |
+
+**Authentication:** All endpoints accept `Authorization: Bearer <token>` header. The mock server does not validate tokens — all requests are allowed.
 
 ---
 
@@ -257,18 +258,6 @@ The reply field returns either **plain text** or **Markdown** (randomly selected
 
 ---
 
-### 📜 Legacy Endpoints (backward compatibility)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/sessions` | Create a new chat session |
-| `POST` | `/api/chat` | Send a message — get a random AI reply |
-| `GET` | `/api/sessions/{session_id}/history` | Get chat history |
-| `DELETE` | `/api/sessions/{session_id}` | Delete a session |
-
-These endpoints are kept for backward compatibility. New integrations should use the OpenClaw or OpenAI-compatible APIs above.
-
----
 
 ## Testing the API
 

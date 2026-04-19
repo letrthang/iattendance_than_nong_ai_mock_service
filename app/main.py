@@ -17,6 +17,7 @@ app = FastAPI(
         "**Two API groups:**\n"
         "- **OpenClaw-compatible** — `/api/v1/sessions/*` and `/api/v1/gateway/*`\n"
         "- **OpenAI-compatible** — `/v1/chat/completions`\n\n"
+        "**Authentication:** All endpoints accept `Authorization: Bearer <token>` header (not validated in mock).\n\n"
         "**Base URL (production mock):** `https://iattendance-than-nong-ai-mock-service.onrender.com`"
     ),
     version="2.0.0",
@@ -33,7 +34,6 @@ tags_metadata = [
     {"name": "Gateway (OpenClaw)", "description": "OpenClaw-compatible gateway management endpoints."},
     {"name": "Sessions (OpenClaw)", "description": "OpenClaw-compatible session endpoints: create, list, send messages."},
     {"name": "Chat Completions (OpenAI)", "description": "OpenAI-compatible `/v1/chat/completions` endpoint."},
-    {"name": "Legacy", "description": "Original endpoints kept for backward compatibility."},
 ]
 app.openapi_tags = tags_metadata
 
@@ -57,19 +57,6 @@ def _session(sid, cid="", uid=""):
 
 
 # ── Pydantic models ─────────────────────────────────────────────────────────
-
-# Legacy
-class CreateSessionRequest(BaseModel):
-    company_id: str = Field(..., example="cmp-001")
-    user_id: str = Field(..., example="usr-001")
-    title: Optional[str] = Field("New conversation", example="Hỏi về chấm công")
-
-
-class ChatRequest(BaseModel):
-    session_id: str = Field(..., example="550e8400-e29b-41d4-a716-446655440000")
-    company_id: str = Field(..., example="cmp-001")
-    user_id: str = Field(..., example="usr-001")
-    message: str = Field(..., example="Hôm nay tôi đã check-in chưa?")
 
 
 # OpenClaw
@@ -117,21 +104,21 @@ def health():
 # ═════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/v1/gateway/start", tags=["Gateway (OpenClaw)"], summary="Start the gateway")
-def gateway_start():
+def gateway_start(authorization: Optional[str] = Header(None)):
     global _gateway_running
     _gateway_running = True
     return {"status": "started", "timestamp": _now()}
 
 
 @app.post("/api/v1/gateway/stop", tags=["Gateway (OpenClaw)"], summary="Stop the gateway")
-def gateway_stop():
+def gateway_stop(authorization: Optional[str] = Header(None)):
     global _gateway_running
     _gateway_running = False
     return {"status": "stopped", "timestamp": _now()}
 
 
 @app.get("/api/v1/gateway/status", tags=["Gateway (OpenClaw)"], summary="Get gateway status")
-def gateway_status():
+def gateway_status(authorization: Optional[str] = Header(None)):
     return {
         "status": "running" if _gateway_running else "stopped",
         "service": "thannong-ai-mock",
@@ -147,7 +134,7 @@ def gateway_status():
 
 @app.post("/api/v1/sessions/create", status_code=201, tags=["Sessions (OpenClaw)"],
           summary="Create a new session")
-def oc_create_session(body: OpenClawCreateSessionRequest):
+def oc_create_session(body: OpenClawCreateSessionRequest, authorization: Optional[str] = Header(None)):
     sid = body.sessionKey or str(uuid.uuid4())
     _sessions[sid] = {
         "meta": {"session_id": sid, "company_id": body.company_id or "",
@@ -160,7 +147,7 @@ def oc_create_session(body: OpenClawCreateSessionRequest):
 
 @app.get("/api/v1/sessions/list", tags=["Sessions (OpenClaw)"],
          summary="List active sessions")
-def oc_list_sessions():
+def oc_list_sessions(authorization: Optional[str] = Header(None)):
     return {
         "sessions": [
             {**s["meta"], "message_count": len(s["messages"])}
@@ -172,7 +159,7 @@ def oc_list_sessions():
 
 @app.post("/api/v1/sessions/send", tags=["Sessions (OpenClaw)"],
           summary="Send a message to a session")
-def oc_send_message(body: OpenClawSendRequest):
+def oc_send_message(body: OpenClawSendRequest, authorization: Optional[str] = Header(None)):
     s = _session(body.sessionKey)
     s["messages"].append({"message_id": str(uuid.uuid4()), "sender": "user",
                           "content": body.message, "timestamp": _now()})
@@ -191,7 +178,7 @@ def oc_send_message(body: OpenClawSendRequest):
 
 @app.get("/api/v1/sessions/{session_id}/history", tags=["Sessions (OpenClaw)"],
          summary="Get chat history for a session")
-def oc_history(session_id: str):
+def oc_history(session_id: str, authorization: Optional[str] = Header(None)):
     if session_id not in _sessions:
         raise HTTPException(404, "Session not found")
     s = _sessions[session_id]
@@ -243,43 +230,3 @@ def openai_chat_completions(body: OpenAIChatRequest, authorization: Optional[str
     }
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# LEGACY ENDPOINTS (backward compatibility)
-# ═════════════════════════════════════════════════════════════════════════════
-
-@app.post("/api/sessions", status_code=201, tags=["Legacy"], summary="[Legacy] Create a new chat session")
-def create_session(body: CreateSessionRequest):
-    sid = str(uuid.uuid4())
-    _sessions[sid] = {
-        "meta": {"session_id": sid, "company_id": body.company_id, "user_id": body.user_id,
-                 "title": body.title or "New conversation", "created_at": _now()},
-        "messages": []
-    }
-    return _sessions[sid]["meta"]
-
-
-@app.post("/api/chat", tags=["Legacy"], summary="[Legacy] Send a message — get a random AI reply")
-def chat(body: ChatRequest):
-    s = _session(body.session_id, body.company_id, body.user_id)
-    s["messages"].append({"message_id": str(uuid.uuid4()), "sender": "user",
-                          "content": body.message, "timestamp": _now()})
-    reply = random.choice(MOCK_RESPONSES)
-    rid = str(uuid.uuid4())
-    ts = _now()
-    s["messages"].append({"message_id": rid, "sender": "assistant", "content": reply, "timestamp": ts})
-    return {"message_id": rid, "session_id": body.session_id, "company_id": body.company_id,
-            "user_id": body.user_id, "user_message": body.message, "reply": reply, "timestamp": ts}
-
-
-@app.get("/api/sessions/{session_id}/history", tags=["Legacy"], summary="[Legacy] Get chat history for a session")
-def history(session_id: str):
-    if session_id not in _sessions:
-        raise HTTPException(404, "Session not found")
-    s = _sessions[session_id]
-    return {"session_id": session_id, "company_id": s["meta"]["company_id"],
-            "user_id": s["meta"]["user_id"], "messages": s["messages"]}
-
-
-@app.delete("/api/sessions/{session_id}", status_code=204, tags=["Legacy"], summary="[Legacy] Delete a session")
-def delete_session(session_id: str):
-    _sessions.pop(session_id, None)
