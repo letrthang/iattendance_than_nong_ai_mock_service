@@ -10,8 +10,15 @@ from pydantic import BaseModel, Field
 from app.responses import MOCK_RESPONSES
 
 # Security scheme — shows "Authorize" button in Swagger UI with Bearer token.
-# Mock service accepts any token (or no token) without validation.
-_bearer = HTTPBearer(auto_error=False, description="Bearer token (accepted but not validated in mock)")
+_bearer = HTTPBearer(description="Enter token: `12345`")
+
+MOCK_API_TOKEN = "12345"
+
+
+def _auth(cred: HTTPAuthorizationCredentials = Depends(_bearer)):
+    if cred.credentials != MOCK_API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing Bearer token. Use: 12345")
+    return cred
 
 app = FastAPI(
     title="Thần Nông AI — Mock Service",
@@ -109,21 +116,21 @@ def health():
 # ═════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/v1/gateway/start", tags=["Gateway (OpenClaw)"], summary="Start the gateway")
-def gateway_start(_cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def gateway_start(_cred: HTTPAuthorizationCredentials = Depends(_auth)):
     global _gateway_running
     _gateway_running = True
     return {"status": "started", "timestamp": _now()}
 
 
 @app.post("/api/v1/gateway/stop", tags=["Gateway (OpenClaw)"], summary="Stop the gateway")
-def gateway_stop(_cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def gateway_stop(_cred: HTTPAuthorizationCredentials = Depends(_auth)):
     global _gateway_running
     _gateway_running = False
     return {"status": "stopped", "timestamp": _now()}
 
 
 @app.get("/api/v1/gateway/status", tags=["Gateway (OpenClaw)"], summary="Get gateway status")
-def gateway_status(_cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def gateway_status(_cred: HTTPAuthorizationCredentials = Depends(_auth)):
     return {
         "status": "running" if _gateway_running else "stopped",
         "service": "thannong-ai-mock",
@@ -139,7 +146,7 @@ def gateway_status(_cred: Optional[HTTPAuthorizationCredentials] = Depends(_bear
 
 @app.post("/api/v1/sessions/create", status_code=201, tags=["Sessions (OpenClaw)"],
           summary="Create a new session")
-def oc_create_session(body: OpenClawCreateSessionRequest, _cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def oc_create_session(body: OpenClawCreateSessionRequest, _cred: HTTPAuthorizationCredentials = Depends(_auth)):
     sid = body.sessionKey or str(uuid.uuid4())
     _sessions[sid] = {
         "meta": {"session_id": sid, "company_id": body.company_id or "",
@@ -152,7 +159,7 @@ def oc_create_session(body: OpenClawCreateSessionRequest, _cred: Optional[HTTPAu
 
 @app.get("/api/v1/sessions/list", tags=["Sessions (OpenClaw)"],
          summary="List active sessions")
-def oc_list_sessions(_cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def oc_list_sessions(_cred: HTTPAuthorizationCredentials = Depends(_auth)):
     return {
         "sessions": [
             {**s["meta"], "message_count": len(s["messages"])}
@@ -164,7 +171,7 @@ def oc_list_sessions(_cred: Optional[HTTPAuthorizationCredentials] = Depends(_be
 
 @app.post("/api/v1/sessions/send", tags=["Sessions (OpenClaw)"],
           summary="Send a message to a session")
-def oc_send_message(body: OpenClawSendRequest, _cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def oc_send_message(body: OpenClawSendRequest, _cred: HTTPAuthorizationCredentials = Depends(_auth)):
     s = _session(body.sessionKey)
     s["messages"].append({"message_id": str(uuid.uuid4()), "sender": "user",
                           "content": body.message, "timestamp": _now()})
@@ -183,7 +190,7 @@ def oc_send_message(body: OpenClawSendRequest, _cred: Optional[HTTPAuthorization
 
 @app.get("/api/v1/sessions/{session_id}/history", tags=["Sessions (OpenClaw)"],
          summary="Get chat history for a session")
-def oc_history(session_id: str, _cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def oc_history(session_id: str, _cred: HTTPAuthorizationCredentials = Depends(_auth)):
     if session_id not in _sessions:
         raise HTTPException(404, "Session not found")
     s = _sessions[session_id]
@@ -196,7 +203,7 @@ def oc_history(session_id: str, _cred: Optional[HTTPAuthorizationCredentials] = 
 
 @app.post("/v1/chat/completions", tags=["Chat Completions (OpenAI)"],
           summary="OpenAI-compatible chat completions (mock)")
-def openai_chat_completions(body: OpenAIChatRequest, _cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+def openai_chat_completions(body: OpenAIChatRequest, _cred: HTTPAuthorizationCredentials = Depends(_auth)):
     # Extract the last user message
     user_msg = ""
     for m in reversed(body.messages):
