@@ -4,6 +4,8 @@
 > No AI integration — responses are randomly selected from a pool of 100 pre-written messages covering the iAttendance domain.
 
 ---
+> **Swagger UI:** https://iattendance-than-nong-ai-mock-service.onrender.com/docs
+---
 
 ## Architecture
 
