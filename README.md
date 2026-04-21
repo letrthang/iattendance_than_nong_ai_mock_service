@@ -5,6 +5,9 @@
 
 ---
 > **Swagger UI:** https://iattendance-than-nong-ai-mock-service.onrender.com/docs
+
+> ⚠️ **Note:** The service will spin down after **15 minutes of inactivity**. The first request after idle may take ~30s to cold-start.
+
 ---
 
 ## Architecture
