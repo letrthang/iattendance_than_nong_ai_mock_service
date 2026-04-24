@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from app.responses import MOCK_RESPONSES
+from app.markdown_utils import normalize_reply
 
 # Security scheme — shows "Authorize" button in Swagger UI with Bearer token.
 _bearer = HTTPBearer(description="Enter token: `12345`")
@@ -175,7 +176,7 @@ def oc_send_message(body: OpenClawSendRequest, _cred: HTTPAuthorizationCredentia
     s = _session(body.sessionKey)
     s["messages"].append({"message_id": str(uuid.uuid4()), "sender": "user",
                           "content": body.message, "timestamp": _now()})
-    reply = random.choice(MOCK_RESPONSES)
+    reply = normalize_reply(random.choice(MOCK_RESPONSES))
     rid = str(uuid.uuid4())
     ts = _now()
     s["messages"].append({"message_id": rid, "sender": "assistant", "content": reply, "timestamp": ts})
@@ -211,7 +212,7 @@ def openai_chat_completions(body: OpenAIChatRequest, _cred: HTTPAuthorizationCre
             user_msg = m.content
             break
 
-    reply = random.choice(MOCK_RESPONSES)
+    reply = normalize_reply(random.choice(MOCK_RESPONSES))
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
     created = int(time.time())
 
